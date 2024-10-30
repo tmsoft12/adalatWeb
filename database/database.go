@@ -27,7 +27,7 @@ func ConnectDB() {
 	if err != nil {
 		log.Fatal("Failed to migrate models:", err)
 	}
-	err = database.AutoMigrate(&models.Views{})
+	err = database.AutoMigrate(&models.Views{}, &models.ChatModel{})
 	if err != nil {
 		log.Fatal("Failed to migrate models:", err)
 	}

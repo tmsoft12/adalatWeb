@@ -2,13 +2,12 @@ package routes
 
 import (
 	"adalat/controllers"
-	"adalat/middleware"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 func Initroutes(app *fiber.App) {
-	home := app.Group("/api", middleware.FakeUser)
+	home := app.Group("/api")
 	home.Get("/home", controllers.HomePage)
 	home.Get("/banner/:id", controllers.BannerGetById)
 	home.Get("/news/:id", controllers.NewsGetById)
@@ -21,4 +20,11 @@ func Initroutes(app *fiber.App) {
 	news.Get("/media", controllers.MediaPage)
 	news.Get("/employer", controllers.EmployerPage)
 	news.Get("/laws", controllers.LawsPage)
+	news.Get("/about", controllers.AboutPage)
+
+	chat := app.Group("/chat")
+	chat.Get("/", controllers.Chat)
+	chat.Post("/:id", controllers.CreateChat)
+	chat.Get("/me", controllers.Me)
+
 }

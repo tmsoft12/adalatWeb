@@ -10,7 +10,6 @@ import (
 func FakeUser(c *fiber.Ctx) error {
 	username := c.Cookies("test")
 	id := fmt.Sprintf("%d", time.Now().Unix())
-
 	if username == "" {
 		cookie := new(fiber.Cookie)
 		cookie.Name = "test"

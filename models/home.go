@@ -51,3 +51,8 @@ type Views struct {
 	UserID int `json:"user_id"`
 	NewsID int `json:"news_id"`
 }
+
+type About struct {
+	ID      uint   `json:"id"`
+	Content string `json:"content"`
+}
