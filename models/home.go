@@ -56,3 +56,9 @@ type About struct {
 	ID      uint   `json:"id"`
 	Content string `json:"content"`
 }
+
+type ViewsMedia struct {
+	ID     int `json:"id" gorm:"primaryKey;autoIncrement"`
+	UserID int `json:"user_id"`
+	NewsID int `json:"news_id"`
+}

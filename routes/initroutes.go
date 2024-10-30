@@ -2,6 +2,7 @@ package routes
 
 import (
 	"adalat/controllers"
+	"adalat/middleware"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -17,7 +18,7 @@ func Initroutes(app *fiber.App) {
 	}))
 
 	// API marşrutlary üçin gurallar
-	home := app.Group("/api")
+	home := app.Group("/api", middleware.FakeUser)
 	home.Get("/home", controllers.HomePage)
 	home.Get("/banner/:id", controllers.BannerGetById)
 	home.Get("/news/:id", controllers.NewsGetById)
@@ -25,7 +26,6 @@ func Initroutes(app *fiber.App) {
 	home.Get("/laws/:id", controllers.LawsGetById)
 	home.Get("/media/:id", controllers.MediaGetById)
 
-	// Bellesmeler
 	news := app.Group("/api")
 	news.Get("/news", controllers.NewsPage)
 	news.Get("/media", controllers.MediaPage)
@@ -33,16 +33,9 @@ func Initroutes(app *fiber.App) {
 	news.Get("/laws", controllers.LawsPage)
 	news.Get("/about", controllers.AboutPage)
 
-	// Chat marşrutlary
 	chat := app.Group("/api/chat")
-
-	// Adaty HTTP marşrutlary
-	chat.Get("/", controllers.Chat)           // Chat maglumatlary almak
-	chat.Post("/:id", controllers.CreateChat) // Täze habar döretmek
-
-	// WebSocket marşrutlary
-	chat.Get("/ws/:id", websocket.New(controllers.ChatReal)) // WebSocket arkaly hakyky wagtly habar alyş-çalşyk
-
-	// User ID döretmek üçin marşrut
+	chat.Get("/", controllers.Chat)
+	chat.Post("/:id", controllers.CreateChat)
+	chat.Get("/ws/:id", websocket.New(controllers.ChatReal))
 	chat.Get("/me", controllers.Me)
 }

@@ -5,8 +5,10 @@ import (
 	"adalat/models"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 const (
@@ -97,11 +99,57 @@ func BannerGetById(c *fiber.Ctx) error {
 
 func NewsGetById(c *fiber.Ctx) error {
 	id := c.Params("id")
+	user := c.Cookies("test")
 
 	var news models.News
 	if err := database.DB.First(&news, id).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Kanunlary almakda säwlik"})
 	}
+
+	// Cookie'den user ID'yi int'e çevir
+	userID, err := strconv.Atoi(user)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid user ID"})
+	}
+
+	// Views tablosunda user_id ve news_id'yi kontrol et
+	var view models.Views
+	newsID, err := strconv.Atoi(id)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid news ID"})
+	}
+
+	if err := database.DB.Where("user_id = ? AND news_id = ?", userID, newsID).First(&view).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Eğer kayıt yoksa yeni bir Views kaydı ekle
+			newView := models.Views{
+				UserID: userID,
+				NewsID: newsID,
+			}
+			if err := database.DB.Create(&newView).Error; err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "Görüntüleme kaydı eklenemedi"})
+			}
+		} else {
+			return c.Status(500).JSON(fiber.Map{"error": "Görüntüleme kontrolünde hata"})
+		}
+	}
+
+	// Haber için farklı kullanıcı sayısını hesapla ve View alanını güncelle
+	var uniqueViews int64
+	if err := database.DB.Model(&models.Views{}).
+		Where("news_id = ?", newsID).
+		Distinct("user_id").
+		Count(&uniqueViews).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Görüntüleme sayısı hesaplanamadı"})
+	}
+
+	// View alanını güncelle
+	news.View = int(uniqueViews)
+	if err := database.DB.Save(&news).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "View alanı güncellenemedi"})
+	}
+
+	// Görsel URL'sini formatla
 	ip := os.Getenv("BASE_URL")
 	port := os.Getenv("PORT")
 	news.Image = formatURL(ip, port, apiPath, news.Image)
@@ -133,10 +181,57 @@ func LawsGetById(c *fiber.Ctx) error {
 
 func MediaGetById(c *fiber.Ctx) error {
 	id := c.Params("id")
+	user := c.Cookies("test")
+
 	var media models.Media
 	if err := database.DB.First(&media, id).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Kanunlary almakda säwlik"})
 	}
+
+	// Cookie'den alınan user ID'yi int'e çevir
+	userID, err := strconv.Atoi(user)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid user ID"})
+	}
+
+	// Views tablosunda user_id ve media_id'yi kontrol et
+	var view models.ViewsMedia
+	mediaID, err := strconv.Atoi(id)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid media ID"})
+	}
+
+	if err := database.DB.Where("user_id = ? AND news_id = ?", userID, mediaID).First(&view).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Eğer kayıt yoksa yeni bir Views kaydı ekle
+			newView := models.ViewsMedia{
+				UserID: userID,
+				NewsID: mediaID, // NewsID alanı Media için de kullanılabilir
+			}
+			if err := database.DB.Create(&newView).Error; err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "Görüntüleme kaydı eklenemedi"})
+			}
+		} else {
+			return c.Status(500).JSON(fiber.Map{"error": "Görüntüleme kontrolünde hata"})
+		}
+	}
+
+	// Benzersiz kullanıcı sayısını hesapla ve View alanını güncelle
+	var uniqueViews int64
+	if err := database.DB.Model(&models.ViewsMedia{}).
+		Where("news_id = ?", mediaID).
+		Distinct("user_id").
+		Count(&uniqueViews).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Görüntüleme sayısı hesaplanamadı"})
+	}
+
+	// View alanını güncelle
+	media.View = int(uniqueViews)
+	if err := database.DB.Save(&media).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "View alanı güncellenemedi"})
+	}
+
+	// Görsel ve video URL'sini formatla
 	ip := os.Getenv("BASE_URL")
 	port := os.Getenv("PORT")
 	media.Cover = formatURL(ip, port, fmt.Sprintf("%s/uploads/media/cover", apiPath), media.Cover)
