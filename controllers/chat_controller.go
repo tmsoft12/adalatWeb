@@ -3,9 +3,7 @@ package controllers
 import (
 	"adalat/database"
 	"adalat/models"
-	"encoding/json"
-	"fmt"
-	"sync"
+	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -13,147 +11,76 @@ import (
 	"github.com/google/uuid"
 )
 
-// Her ulanyjynyň baglanyşygyny saklamak üçin map we mutex
-var clients = make(map[string]map[*websocket.Conn]bool)
-var mutex = sync.Mutex{}
+var clients = make(map[string]*websocket.Conn)
 
 func Me(c *fiber.Ctx) error {
 	id := uuid.New().String()
 	return c.Status(200).JSON(fiber.Map{"user_id": id})
 }
 
-func Chat(c *fiber.Ctx) error {
-	id := c.Params("id")
-	var chats []models.ChatModel
-
-	// Ulanyjynyň habarlaryny almak üçin maglumatlar bazasy bilen habarlaşmak
-	if err := database.DB.Where("user_id = ?", id).Find(&chats).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+// ChatHandler ulanyjynyň WebSocket baglanyşygyny açmak üçin ulanylýar
+func ChatHandler(c *fiber.Ctx) error {
+	// Ulanyjynyň ID-ni almak
+	userID := c.Query("user_id")
+	if userID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "user_id gerekli"})
 	}
 
-	return c.JSON(fiber.Map{
-		"data": chats,
-	})
+	if websocket.IsWebSocketUpgrade(c) {
+		// WebSocket baglanyşygyny açmak
+		return c.Next()
+	}
+	return fiber.ErrUpgradeRequired
 }
 
-func ChatReal(c *websocket.Conn) {
-	id := c.Params("id")
+// WebSocket ulanyjynyň baglanýan wagtynda we habarlary alýan wagtynda işledilýär
+func WebSocket(c *websocket.Conn) {
+	// Ulanyjy ID-sini alyň
+	userID := c.Query("user_id")
+	clients[userID] = c
+	defer delete(clients, userID)
 
-	// Baglanan ulanyjyny goşmak
-	mutex.Lock()
-	if clients[id] == nil {
-		clients[id] = make(map[*websocket.Conn]bool)
-	}
-	clients[id][c] = true
-	mutex.Unlock()
-
-	// Baglanyşyk ýapylanda ulanyjyny aýyr
-	defer func() {
-		mutex.Lock()
-		delete(clients[id], c)
-		if len(clients[id]) == 0 {
-			delete(clients, id)
+	// Ulanyjynyň öňki habarlaryny maglumatlar bazasyndan al
+	var previousMessages []models.ChatModel
+	if err := database.DB.Where("user_id = ?", userID).Find(&previousMessages).Error; err != nil {
+		log.Println("Öňki habarlary almakda ýalňyşlyk:", err)
+	} else {
+		// Ulanyja öňki habarlary ugratmak
+		for _, msg := range previousMessages {
+			if err := c.WriteJSON(msg); err != nil {
+				log.Println("Öňki habarlary ugratmakda ýalňyşlyk:", err)
+				break
+			}
 		}
-		mutex.Unlock()
-		c.Close()
-	}()
-
-	// Ulanyjynyň habarlaryny başlangyçdan almak
-	var chats []models.ChatModel
-	if err := database.DB.Where("user_id = ?", id).Find(&chats).Error; err != nil {
-		c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(`{"error": "%v"}`, err.Error())))
-		return
 	}
 
-	// Başlangyç maglumatlary WebSocket arkaly ibermek
-	initialData := map[string]interface{}{
-		"data": chats,
-	}
-
-	initialDataJson, err := json.Marshal(initialData)
-	if err != nil {
-		fmt.Println("Error marshalling initial data:", err)
-		return
-	}
-
-	if err := c.WriteMessage(websocket.TextMessage, initialDataJson); err != nil {
-		fmt.Println("Başlangyç maglumatlary iberip bolmady:", err)
-		return
-	}
-
-	// Ulanyjynyň her habaryny yzyna iber
+	// Täze habarlary kabul edip we gaýtadan işleýäris
 	for {
-		_, msg, err := c.ReadMessage()
-		if err != nil {
-			fmt.Println("Ulanyjy baglandy:", err)
+		var msg models.ChatModel
+		if err := c.ReadJSON(&msg); err != nil {
+			log.Println("Okuw ýalňyşlygy:", err)
 			break
 		}
 
-		// Täze habary döredýäris
-		var chat models.ChatModel
-		if err := json.Unmarshal(msg, &chat); err != nil {
-			fmt.Println("Habar çözmekde hata:", err)
-			continue
-		}
-		chat.User_Id = id
-		chat.CreatedAt = time.Now().Format("2006-01-02 15:04:05")
+		// Habar wagtyny kesgitläň
+		msg.CreatedAt = time.Now().Format(time.RFC3339)
 
-		// Habar maglumatlaryny maglumatlar bazasyna goşmak
-		if err := database.DB.Where("user_id = ?", id).Find(&chats).Error; err != nil {
-			c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(`{"error": "%v"}`, err.Error())))
-			return
+		// Maglumatlary maglumatlar bazasyna ýazga geçirmek
+		if database.DB != nil {
+			if err := database.DB.Create(&msg).Error; err != nil {
+				log.Println("Maglumatlar bazasyna ýazmak ýalňyşlygy:", err)
+				continue
+			}
+		} else {
+			log.Println("Maglumat bazasy baglanyşygynyň geçirilmedigini görkezer")
 		}
-		// Täze habary diňe degişli ulanyja ibermek
-		mutex.Lock()
-		messageData := map[string]interface{}{
-			"type": "new_message",
-			"data": chat,
-		}
-		messageJson, err := json.Marshal(messageData)
-		if err == nil {
-			for client := range clients[id] {
-				client.WriteMessage(websocket.TextMessage, messageJson)
+
+		// Ulanyjynyň ID-sine görä habar iberiň
+		if client, ok := clients[msg.User_Id]; ok {
+			if err := client.WriteJSON(msg); err != nil {
+				log.Println("Ýazmak ýalňyşlygy:", err)
+				break
 			}
 		}
-		mutex.Unlock()
 	}
-}
-
-func CreateChat(c *fiber.Ctx) error {
-	id := c.Params("id")
-	var chat models.ChatModel
-	if err := c.BodyParser(&chat); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Veri işlenemedi",
-		})
-	}
-	chat.User_Id = id
-	chat.CreatedAt = time.Now().Format("2006-01-02 15:04:05")
-
-	if err := database.DB.Create(&chat).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	// Täze habary ähli baglanan ulanyjylara ibermek
-	mutex.Lock()
-	messageData := map[string]interface{}{
-		"type": "new_message",
-		"data": chat,
-	}
-	messageJson, err := json.Marshal(messageData)
-	if err == nil {
-		for client := range clients[id] {
-			client.WriteMessage(websocket.TextMessage, messageJson)
-		}
-	}
-	mutex.Unlock()
-
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "s",
-		"data":    chat,
-	})
 }

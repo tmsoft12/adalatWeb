@@ -10,10 +10,22 @@ import (
 )
 
 func main() {
+	// Maglumat bazasyna baglanyşmak
 	database.ConnectDB()
+
+	// Fiber app döretmek
 	app := fiber.New()
 	app.Use(logger.New())
+
+	// IP adresini almak
 	ip := os.Getenv("BASE_URL")
+	if ip == "" {
+		ip = "localhost"
+	}
+
+	// Ýollary konfigurasiýa etmek
 	routes.Initroutes(app)
+
+	// Serweri işledýäris
 	app.Listen(ip + ":3000")
 }

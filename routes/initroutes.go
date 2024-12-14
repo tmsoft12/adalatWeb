@@ -6,16 +6,17 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/websocket/v2"
 )
 
 func Initroutes(app *fiber.App) {
-	// CORS konfigurasiýasy
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",                            // Islegleriň hemmesine rugsat berýär
-		AllowMethods: "GET,POST,PUT,DELETE",          // Isleg edilýän HTTP metodlaryna rugsat
-		AllowHeaders: "Origin, Content-Type, Accept", // Başyklara rugsat
+		AllowOrigins: "*",
+		AllowMethods: "GET,POST,PUT,DELETE",
+		AllowHeaders: "Origin, Content-Type, Accept",
 	}))
+	app.Get("/metrics", monitor.New(monitor.Config{Title: "MyService Metrics Page"}))
 
 	// API marşrutlary üçin gurallar
 	home := app.Group("/api", middleware.FakeUser)
@@ -34,8 +35,8 @@ func Initroutes(app *fiber.App) {
 	news.Get("/about", controllers.AboutPage)
 
 	chat := app.Group("/api/chat")
-	chat.Get("/", controllers.Chat)
-	chat.Post("/:id", controllers.CreateChat)
-	chat.Get("/ws/:id", websocket.New(controllers.ChatReal))
+	chat.Get("/", controllers.ChatHandler)
+	chat.Get("/ws", websocket.New(controllers.WebSocket))
 	chat.Get("/me", controllers.Me)
+
 }

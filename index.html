@@ -1,140 +1,95 @@
 <!DOCTYPE html>
-<html lang="tk">
+<html lang="tr">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Application</title>
+    <title>Chat Uygulaması</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f9fafb;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            color: #333;
+            margin: 20px;
         }
 
-        h1 {
-            color: #4CAF50;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-
-        #chat-box {
-            border: 1px solid #ddd;
-            padding: 15px;
-            background-color: white;
-            height: 400px;
-            overflow-y: scroll;
-            margin-bottom: 20px;
-            width: 100%;
-            max-width: 600px;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .message {
-            padding: 10px;
-            border-radius: 6px;
-            max-width: 75%;
-            color: #333;
-            word-wrap: break-word;
-        }
-
-        .sent {
-            align-self: flex-end;
-            background-color: #daf5d9;
-            text-align: right;
-        }
-
-        .received {
-            align-self: flex-start;
-            background-color: #e4e7eb;
-        }
-
-        .admin {
-            background-color: #e0f7fa;
-            /* Admin habarlar üçin ýörite reňk */
-            font-weight: bold;
-        }
-
-        #message-input {
-            width: 100%;
-            max-width: 600px;
-            padding: 12px;
-            margin-bottom: 10px;
+        #chatContainer {
             border: 1px solid #ccc;
-            border-radius: 5px;
-            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
-            font-size: 16px;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
         }
 
-        #send-button {
-            width: 100%;
-            max-width: 600px;
-            padding: 12px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
+        #messageInput {
+            width: 80%;
+            padding: 10px;
         }
 
-        #send-button:hover {
-            background-color: #45a049;
+        #sendButton {
+            padding: 10px;
         }
     </style>
 </head>
 
 <body>
-    <h1>Chat Application</h1>
-    <div id="chat-box"></div>
-    <input type="text" id="message-input" placeholder="Habar ýaz..." />
-    <button id="send-button">Ibermek</button>
+    <h1>Chat Uygulaması</h1>
+    <div id="chatContainer"></div>
+    <input type="text" id="messageInput" placeholder="Mesajınızı yazın..." />
+    <button id="sendButton">Gönder</button>
 
     <script>
-        const userId = "248fc35c-2fbb-4640-b765-39e406d6f57a"; // Bu ýerde ulanyjy ID-si giriziň
+        const userId = "fbc4080d-59fe-43a3-81ee-8b385ba1625a"; // Kullanıcı ID'si
         const ws = new WebSocket(`ws://192.168.100.180:3000/api/chat/ws/${userId}`);
 
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === "admin_message") {
-                const messageDiv = document.createElement("div");
-                messageDiv.classList.add("message", "received", "admin");
-                messageDiv.textContent = data.content.content || "Empty admin message";
-                document.getElementById("chat-box").appendChild(messageDiv);
-                document.getElementById("chat-box").scrollTop = document.getElementById("chat-box").scrollHeight;
+        let messages = []; // Mesajları saklayacak dizi
+
+        ws.onopen = function () {
+            console.log("WebSocket bağlantısı açıldı.");
+        };
+
+        ws.onmessage = function (event) {
+            const messageData = JSON.parse(event.data);
+            // Eğer gelen veri bir dizi ise, diziyi birleştir
+            if (Array.isArray(messageData.data)) {
+                messages = messages.concat(messageData.data); // Gelen diziyi mevcut diziye ekle
             } else {
-                const messageDiv = document.createElement("div");
-                messageDiv.classList.add("message", "received");
-                messageDiv.textContent = data.data.content || "Empty message";
-                document.getElementById("chat-box").appendChild(messageDiv);
-                document.getElementById("chat-box").scrollTop = document.getElementById("chat-box").scrollHeight;
+                messages.push(messageData.data); // Tekil mesajı ekle
+            }
+            displayMessages(); // Tüm mesajları görüntüle
+        };
+
+        ws.onclose = function () {
+            console.log("WebSocket bağlantısı kapandı.");
+        };
+
+        // Tüm mesajları görüntüleme fonksiyonu
+        function displayMessages() {
+            const chatContainer = document.getElementById("chatContainer");
+            chatContainer.innerHTML = ""; // Öncelikle mevcut içeriği temizle
+            messages.forEach(message => {
+                const messageElement = document.createElement("div");
+                messageElement.textContent = `Mesaj: ${message.content} - Gönderim Zamanı: ${message.created_at}`; // Gelen mesajları göster
+                chatContainer.appendChild(messageElement);
+            });
+            chatContainer.scrollTop = chatContainer.scrollHeight; // En altta kalması için kaydır
+        }
+
+        // Mesaj gönderme fonksiyonu
+        document.getElementById("sendButton").onclick = function () {
+            const messageInput = document.getElementById("messageInput");
+            const content = messageInput.value;
+
+            if (content) {
+                sendMessage(content);
+                messageInput.value = ""; // Mesaj gönderildikten sonra girişi temizle
             }
         };
 
-        document.getElementById("send-button").onclick = () => {
-            const messageInput = document.getElementById("message-input");
-            const message = messageInput.value;
-            if (message) {
-                const messageData = {
-                    content: message,
-                };
-                ws.send(JSON.stringify(messageData));
-                messageInput.value = "";
-                const messageDiv = document.createElement("div");
-                messageDiv.classList.add("message", "sent");
-                messageDiv.textContent = message;
-                document.getElementById("chat-box").appendChild(messageDiv);
-                document.getElementById("chat-box").scrollTop = document.getElementById("chat-box").scrollHeight;
-            }
-        };
+        function sendMessage(content) {
+            const message = {
+                content: content
+            };
+            ws.send(JSON.stringify(message));
+        }
+
     </script>
 </body>
 
