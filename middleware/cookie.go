@@ -14,6 +14,7 @@ func FakeUser(c *fiber.Ctx) error {
 		cookie := new(fiber.Cookie)
 		cookie.Name = "test"
 		cookie.Value = id
+		cookie.Domain = "adalatlyhukuk.com.tm/"
 		cookie.Expires = time.Now().Add(24 * time.Hour)
 		cookie.HTTPOnly = true
 		c.Cookie(cookie)

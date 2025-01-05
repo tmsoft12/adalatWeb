@@ -17,8 +17,8 @@ func main() {
 	app := fiber.New()
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "216.150.14.12", // İzin verilen IP adresi
-		AllowHeaders: "*",             // Tüm header'lara izin veriliyor
+		AllowOrigins: "http://216.150.14.12, http://127.0.0.1", // İzin verilen IP adresi
+		AllowHeaders: "*",                                      // Tüm header'lara izin veriliyor
 	}))
 
 	// IP adresini almak
@@ -27,9 +27,8 @@ func main() {
 		ip = "localhost"
 	}
 
-	// Ýollary konfigurasiýa etmek
 	routes.Initroutes(app)
 
 	// Serweri işledýäris
-	app.Listen(ip + ":3000")
+	app.Listen(":3000")
 }

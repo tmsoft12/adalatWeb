@@ -52,7 +52,7 @@ func HomePage(c *fiber.Ctx) error {
 	}
 
 	var news []models.News
-	if err := database.DB.Find(&news).Error; err != nil {
+	if err := database.DB.Where("is_active = ?", true).Find(&news).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Täzelikleri almakda säwlik"})
 	}
 	for i := range news {
@@ -60,7 +60,7 @@ func HomePage(c *fiber.Ctx) error {
 	}
 
 	var media []models.Media
-	if err := database.DB.Find(&media).Error; err != nil {
+	if err := database.DB.Where("is_active = ?", true).Find(&media).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Media maglumatlaryny almakda säwlik"})
 	}
 	for i := range media {

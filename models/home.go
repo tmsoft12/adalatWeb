@@ -23,6 +23,7 @@ type News struct {
 	RU_description string `json:"ru_description"`
 	View           int    `json:"view"`
 	Date           string `json:"date"`
+	IsActive       bool   `json:"isactive"`
 }
 type Media struct {
 	ID       int    `json:"id" gorm:"primaryKey;autoIncrement"`
@@ -33,6 +34,7 @@ type Media struct {
 	RU_title string `json:"ru_title"`
 	Date     string `json:"date"`
 	View     int    `json:"view"`
+	IsActive bool   `json:"isactive"`
 }
 type Employer struct {
 	ID      int    `json:"id"`
