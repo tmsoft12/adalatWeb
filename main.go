@@ -29,6 +29,5 @@ func main() {
 
 	routes.Initroutes(app)
 
-	// Serweri işledýäris
 	app.Listen(":3000")
 }
